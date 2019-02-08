@@ -598,6 +598,20 @@ int utf8_len (const char *s, int len) {
   return r;
 }
 
+static inline char ascii_char_norm (char c) {   // convert ascii to lowercase
+    return (c >= 0x41 && c <= 0x5A) ? c + 32 : c;
+}
+
+static int ascii_cmp_nocase (const char *what, const char *with, size_t num) {    //memcmp with to lowercase
+  size_t i;
+  for (i = 0; i < num; i ++) {
+    if (ascii_char_norm (what[i]) != ascii_char_norm (with[i])) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
 static char *process_html_text (struct tgl_state *TLS, const char *text, int text_len, int *ent_size, int **ent) {
   char *new_text = talloc (2 * text_len + 1);
   int stpos[100];
@@ -619,7 +633,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         return NULL;
       }
       int old_p = *ent_size;
-      if (text_len - p >= 3 && !memcmp (text + p, "<b>", 3)) {
+      if (text_len - p >= 3 && !ascii_cmp_nocase (text + p, "<b>", 3)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_bold;
@@ -630,7 +644,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 2;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</b>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</b>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 0) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -641,7 +655,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 3 && !memcmp (text + p, "<i>", 3)) {
+      if (text_len - p >= 3 && !ascii_cmp_nocase (text + p, "<i>", 3)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_italic;
@@ -652,7 +666,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 2;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</i>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</i>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 1) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -663,7 +677,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 6 && !memcmp (text + p, "<code>", 6)) {
+      if (text_len - p >= 6 && !ascii_cmp_nocase (text + p, "<code>", 6)) {
         increase_ent (ent_size, ent, 3);
         total ++;
         (*ent)[old_p] = CODE_message_entity_code;
@@ -674,7 +688,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 5;
         continue;
       }
-      if (text_len - p >= 7 && !memcmp (text + p, "</code>", 7)) {
+      if (text_len - p >= 7 && !ascii_cmp_nocase (text + p, "</code>", 7)) {
         if (stp == 0 || sttype[stp - 1]  != 2) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -685,12 +699,12 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 6;
         continue;
       }
-      if (text_len - p >= 9 && !memcmp (text + p, "<a href=\"", 9)) {
+      if (text_len - p >= 9 && !ascii_cmp_nocase (text + p, "<a href=\"", 9)) {
         int pp = p + 9;
         while (pp < text_len && text[pp] != '"') {
           pp ++;
         }
-        if (pp == text_len || pp == text_len - 1 || text[pp + 1] != '>') {
+        if (pp == text_len || pp == text_len - 1) {
           tgl_set_query_error (TLS, EINVAL, "<a> tag did not close");
           tfree (new_text, 2 * text_len + 1);
           return NULL;
@@ -716,10 +730,13 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         memcpy (r + 1, text + p + 9, len);
         memset (r + 1 + len, 0, (-len-1) & 3);
 
-        p = pp + 1;
+        while (pp < text_len && text[pp] != '>') {
+          pp ++;
+        }
+        p = pp;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "</a>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "</a>", 4)) {
         if (stp == 0 || sttype[stp - 1]  != 3) {
           tgl_set_query_error (TLS, EINVAL, "Invalid tag nest");
           tfree (new_text, 2 * text_len + 1);
@@ -730,7 +747,7 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
         p += 3;
         continue;
       }
-      if (text_len - p >= 4 && !memcmp (text + p, "<br>", 4)) {
+      if (text_len - p >= 4 && !ascii_cmp_nocase (text + p, "<br>", 4)) {
         new_text[cur_p ++] = '\n';
         p += 3;
         continue;
@@ -738,16 +755,19 @@ static char *process_html_text (struct tgl_state *TLS, const char *text, int tex
       tgl_set_query_error (TLS, EINVAL, "Unknown tag");
       tfree (new_text, 2 * text_len + 1);
       return NULL;
-    } else if (text_len - p >= 4  && !memcmp (text + p, "&gt;", 4)) {
+    } else if (text_len - p >= 4  && !ascii_cmp_nocase (text + p, "&gt;", 4)) {
       p += 3;
       new_text[cur_p ++] = '>';
-    } else if (text_len - p >= 4  && !memcmp (text + p, "&lt;", 4)) {
+    } else if (text_len - p >= 4  && !ascii_cmp_nocase (text + p, "&lt;", 4)) {
       p += 3;
       new_text[cur_p ++] = '<';
-    } else if (text_len - p >= 5  && !memcmp (text + p, "&amp;", 5)) {
+    } else if (text_len - p >= 5  && !ascii_cmp_nocase (text + p, "&amp;", 5)) {
       p += 4;
       new_text[cur_p ++] = '&';
-    } else if (text_len - p >= 6  && !memcmp (text + p, "&nbsp;", 6)) {
+    } else if (text_len - p >= 6  && !ascii_cmp_nocase (text + p, "&quot;", 6)) {
+      p += 5;
+      new_text[cur_p ++] = '"';
+    } else if (text_len - p >= 6  && !ascii_cmp_nocase (text + p, "&nbsp;", 6)) {
       p += 5;
       new_text[cur_p ++] = 0xc2;
       new_text[cur_p ++] = 0xa0;
@@ -1097,6 +1117,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
       }
     } else {
       out_int (CODE_reply_keyboard_hide);
+      out_int (M->reply_markup->flags);
     }
   }
 
@@ -1862,7 +1883,6 @@ static void send_avatar_end (struct tgl_state *TLS, struct send_file *f, void *c
     out_int (CODE_input_chat_uploaded_photo);
     break;
   case TGL_PEER_USER:
-    out_int (CODE_photos_upload_profile_photo);
     out_int (CODE_photos_upload_profile_photo);
     break;
   case TGL_PEER_CHANNEL:
@@ -2899,6 +2919,9 @@ void _tgl_do_channel_get_members  (struct tgl_state *TLS, struct channel_get_mem
   case 3:
     out_int (CODE_channel_participants_kicked);
     break;
+  case 4:
+    out_int (CODE_channel_participants_bots);
+    break;
   default:
     out_int (CODE_channel_participants_recent);
     break;
@@ -3301,6 +3324,13 @@ void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location 
 }
 
 void tgl_do_load_photo (struct tgl_state *TLS, struct tgl_photo *photo, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
+   if(photo == NULL) {
+    tgl_set_query_error (TLS, EINVAL, "Bad photo (invalid)");
+    if (callback) {
+      callback (TLS, callback_extra, 0, 0);
+    }
+    return;
+  }
   if (!photo->sizes_num) {
     tgl_set_query_error (TLS, EINVAL, "Bad photo (no photo sizes");
     if (callback) {
@@ -3331,7 +3361,7 @@ static void _tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V
   D->id = V->id;
   D->access_hash = V->access_hash;
   D->dc = V->dc_id;
-  D->name = 0;
+  D->name = V->caption;
   D->fd = -1;
   
   if (V->mime_type) {
@@ -3743,13 +3773,14 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     }
 
     for (i = 0; i < ml_pos; i++) {
+      // Ignore invalid messages, would cause a null ptr deref otherwise
+      if (ML[i] == NULL) continue;
       bl_do_msg_update (TLS, &ML[i]->permanent_id);
     }
     for (i = 0; i < el_pos; i++) {
       // messages to secret chats that no longer exist are not initialized and NULL
-      if (EL[i]) {
-        bl_do_msg_update (TLS, &EL[i]->permanent_id);
-      }
+      if (EL[i] == NULL) continue;
+      bl_do_msg_update (TLS, &EL[i]->permanent_id);
     }
 
     tfree (ML, ml_pos * sizeof (void *));
