@@ -1,3 +1,7 @@
+# Telegram API
+
+[![Build Status](https://travis-ci.com/cli-inc/tgl.svg?branch=master)](https://travis-ci.com/cli-inc/tgl)
+
 This is library that handles telegram api and protocol.
 
 Current versions:
