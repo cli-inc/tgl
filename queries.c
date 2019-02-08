@@ -1117,6 +1117,7 @@ void tgl_do_send_msg (struct tgl_state *TLS, struct tgl_message *M, void (*callb
       }
     } else {
       out_int (CODE_reply_keyboard_hide);
+      out_int (M->reply_markup->flags);
     }
   }
 
@@ -2918,6 +2919,9 @@ void _tgl_do_channel_get_members  (struct tgl_state *TLS, struct channel_get_mem
   case 3:
     out_int (CODE_channel_participants_kicked);
     break;
+  case 4:
+    out_int (CODE_channel_participants_bots);
+    break;
   default:
     out_int (CODE_channel_participants_recent);
     break;
@@ -3321,7 +3325,7 @@ void tgl_do_load_file_location (struct tgl_state *TLS, struct tgl_file_location 
 
 void tgl_do_load_photo (struct tgl_state *TLS, struct tgl_photo *photo, void (*callback)(struct tgl_state *TLS, void *callback_extra, int success, const char *filename), void *callback_extra) {
    if(photo == NULL) {
-    tgl_set_query_error (TLS, EINVAL, "Bad photo (cannot download");
+    tgl_set_query_error (TLS, EINVAL, "Bad photo (invalid)");
     if (callback) {
       callback (TLS, callback_extra, 0, 0);
     }
@@ -3357,7 +3361,7 @@ static void _tgl_do_load_document (struct tgl_state *TLS, struct tgl_document *V
   D->id = V->id;
   D->access_hash = V->access_hash;
   D->dc = V->dc_id;
-  D->name = 0;
+  D->name = V->caption;
   D->fd = -1;
   
   if (V->mime_type) {
@@ -3769,13 +3773,14 @@ static int get_difference_on_answer (struct tgl_state *TLS, struct query *q, voi
     }
 
     for (i = 0; i < ml_pos; i++) {
+      // Ignore invalid messages, would cause a null ptr deref otherwise
+      if (ML[i] == NULL) continue;
       bl_do_msg_update (TLS, &ML[i]->permanent_id);
     }
     for (i = 0; i < el_pos; i++) {
       // messages to secret chats that no longer exist are not initialized and NULL
-      if (EL[i]) {
-        bl_do_msg_update (TLS, &EL[i]->permanent_id);
-      }
+      if (EL[i] == NULL) continue;
+      bl_do_msg_update (TLS, &EL[i]->permanent_id);
     }
 
     tfree (ML, ml_pos * sizeof (void *));
