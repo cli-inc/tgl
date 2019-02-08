@@ -361,7 +361,7 @@ struct tgl_user {
   int blocked;
   char *real_first_name;
   char *real_last_name;
-
+  int bot;
   struct tgl_bot_info *bot_info;
 };
 
@@ -531,6 +531,7 @@ struct tgl_message_action {
     int read_cnt;
     int delete_cnt;
     int screenshot_cnt;
+    int channel_id;
     enum tgl_typing_status typing;
     struct {
       int start_seq_no;
